@@ -14,7 +14,10 @@ ConfigurationGenerator.exe <templatefile> <destinationfile>
     <BackgroundImage src="images/bg.jpg" />
 </SimpleConfigurationSection>
 ```
-As you can see in this example you can add regular xml elements to the root element. However it isn't possible to have a collection of items in the configuration section root element
+As you can see in this example you can add regular xml elements to the root element. 
+
+### Collections
+It isn't possible to have a collection of items in the configuration section root element
 
 ```Xml
 <InvalidConfigurationSection>
