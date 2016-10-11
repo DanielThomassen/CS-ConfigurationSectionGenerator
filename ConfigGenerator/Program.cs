@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using ConfigGen;
-using System.IO;
+using System.Diagnostics;
 
 namespace ConfigGenerator
 {
@@ -12,7 +7,7 @@ namespace ConfigGenerator
     {
         static void Main(string[] args)
         {
-            if(string.IsNullOrEmpty(args[0]) || string.IsNullOrEmpty(args[1]))
+            if(args.Length == 0 || string.IsNullOrEmpty(args[0]) || string.IsNullOrEmpty(args[1]))
             {
                 Usage();
                 return;
@@ -24,7 +19,13 @@ namespace ConfigGenerator
 
         static void Usage()
         {
-            Console.WriteLine(@"ConfigGenerator.exe <templatefile> <destinationfile>");
+            System.Reflection.Assembly assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
+            string version = fvi.FileVersion;
+            Console.WriteLine("Configuration Generator \nversion {0}", version);
+            Console.WriteLine("usage: ConfigGenerator <templatefile> <destinationfile>");
+            Console.WriteLine("More information at: https://github.com/DanielThomassen/CS-ConfigurationSectionGenerator");
+            Console.WriteLine();
         }
     }
 }
