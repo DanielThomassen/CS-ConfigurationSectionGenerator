@@ -39,7 +39,6 @@ Trying to generate code from this XML will result in the application failing. Yo
 
 ## Known issues / limitations
 - Validation hasn't been implemented yet
-- All classes outputted into the same file
 - No way of defining attribute types (everything is a string)
 - Cannot have a ConfigurationSection which has '.' in it's name
 - Cannot configure the namespace for the generated classes
