@@ -217,7 +217,7 @@ namespace ConfigGen
         /// <returns>The created object</returns>
         protected CodeTypeDeclaration CreateRegularElement(XElement doc)
         {
-            CodeTypeDeclaration element = new CodeTypeDeclaration(string.Format("{0}Element", UpperCaseFirst(doc.Name.LocalName)));
+            CodeTypeDeclaration element = new CodeTypeDeclaration(GetRegularElementName(doc));
             element.IsClass = true;
             element.TypeAttributes = System.Reflection.TypeAttributes.Public;
             element.BaseTypes.Add(new CodeTypeReference { BaseType = typeof(ConfigurationElement).FullName });
@@ -226,6 +226,25 @@ namespace ConfigGen
             return element;
         }
 
+        /// <summary>
+        /// Get class name for a ConfigurationElement
+        /// </summary>
+        /// <param name="element">Xml element representing the classe</param>
+        /// <returns>Name of the class to be generated</returns>
+        protected string GetRegularElementName(XElement element)
+        {
+            return string.Format("{0}{1}",UpperCaseFirst(element.Name.LocalName), "Element");
+        }
+
+        /// <summary>
+        /// Get Class name for a ConfigurationCollection
+        /// </summary>
+        /// <param name="element">Element to determine name for</param>
+        /// <returns>Classname to use</returns>
+        protected string GetCollectionElementName(XElement element)
+        {
+            return string.Format("{0}{1}", UpperCaseFirst(element.Name.LocalName ), "Collection");
+        }
 
         /// <summary>
         /// Creates an <see cref="ConfigurationElementCollection"/> object and it's child element
@@ -234,9 +253,9 @@ namespace ConfigGen
         /// <returns>The created object</returns>
         protected CodeTypeDeclaration CreateCollectionElement(XElement doc)
         {
-            CodeTypeDeclaration element = new CodeTypeDeclaration(UpperCaseFirst(doc.Name.LocalName + "Collection"));
+            CodeTypeDeclaration element = new CodeTypeDeclaration(GetCollectionElementName(doc));
             string collectionType = "";
-            collectionType = UpperCaseFirst(doc.Elements().First().Name.LocalName);
+            collectionType = GetRegularElementName(doc.Elements().First());
             element.CustomAttributes.Add(new CodeAttributeDeclaration(
                 "ConfigurationCollection", 
                 new CodeAttributeArgument[]
