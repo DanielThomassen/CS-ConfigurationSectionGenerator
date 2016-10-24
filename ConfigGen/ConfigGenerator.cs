@@ -174,8 +174,7 @@ namespace ConfigGen
                 _createdTypes.Add(doc.Name.LocalName);
             }
 
-            var isCollection = doc.Elements().Count() != doc.Elements().Select(e => e.Name.LocalName).Distinct().Count();
-            if(isCollection)
+            if(ElementIsCollection(doc))
             {
                 return CreateCollectionElement(doc);
             }
@@ -183,6 +182,20 @@ namespace ConfigGen
             {
                 return CreateRegularElement(doc);
             }
+        }
+
+        
+        /// <summary>
+        /// Checks if an XML element is a collection
+        /// </summary>
+        /// <param name="element">Element to check</param>
+        /// <returns>True when element is a collection</returns>
+        private bool ElementIsCollection(XElement element)
+        {
+            var subElementCount = element.Elements().Count();
+            var uniqueElementCount = element.Elements().Select(e => e.Name.LocalName).Distinct().Count();
+            // There is more than one sub element and only one type of sub element
+            return subElementCount > 1 && uniqueElementCount == 1;
         }
 
         /// <summary>
@@ -222,8 +235,23 @@ namespace ConfigGen
             element.TypeAttributes = System.Reflection.TypeAttributes.Public;
             element.BaseTypes.Add(new CodeTypeReference { BaseType = typeof(ConfigurationElement).FullName });
             AddAttibutes(doc, element);
+            AddSubElements(doc, element);
             _namespace.Types.Add(element);
             return element;
+        }
+
+        /// <summary>
+        /// Add subelements to a regular element
+        /// </summary>
+        /// <param name="doc">Xml element containing the subelements</param>
+        /// <param name="element">Type to add the SubElements to</param>
+        private void AddSubElements(XElement doc, CodeTypeDeclaration element)
+        {
+            foreach (var subElement in doc.Elements())
+            {
+                var sub = CreateElement(subElement);
+                AddAttribute(subElement.Name.LocalName, element, new CodeTypeReference(sub.Name));
+            }
         }
 
         /// <summary>
