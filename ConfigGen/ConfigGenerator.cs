@@ -324,19 +324,19 @@ namespace ConfigGen
                         attributeType,
                         new CodeIndexerExpression(
                             new CodeThisReferenceExpression(),
-                            new CodePrimitiveExpression(name.ToLower())
+                            new CodePrimitiveExpression(name)
                         ))));
 
             property.SetStatements.Add(
                 new CodeAssignStatement(
                     new CodeIndexerExpression(
                         new CodeThisReferenceExpression(),
-                        new CodePrimitiveExpression(name.ToLower())
+                        new CodePrimitiveExpression(name)
                     ),
                     new CodePropertySetValueReferenceExpression()
                 ));
             property.CustomAttributes.Add(new CodeAttributeDeclaration(new CodeTypeReference("ConfigurationProperty"), new CodeAttributeArgument[] {
-                    new CodeAttributeArgument(new CodePrimitiveExpression (name.ToLower()))
+                    new CodeAttributeArgument(new CodePrimitiveExpression (name))
                 }));
             element.Members.Add(property);
         }
