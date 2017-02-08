@@ -8,6 +8,7 @@ using System.Configuration;
 using Microsoft.CSharp;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
+using System.Collections;
 
 namespace ConfigGen
 {
@@ -27,7 +28,7 @@ namespace ConfigGen
         /// <summary>
         /// Additional Namespaces to include 
         /// </summary>
-        public ConfigurationNamespaceCollection Namespaces  { get; private set; }
+        public ConfigurationNamespaceCollection Namespaces { get; private set; }
 
         /// <summary>
         /// Provider to use to generate code. E.g. <see cref="CSharpCodeProvider"/>
@@ -41,11 +42,12 @@ namespace ConfigGen
         /// Initialise the generator
         /// </summary>
         /// <param name="path">Path to an XML file containing an example config</param>
-        public ConfigGenerator(Uri path) { 
-             init();
+        public ConfigGenerator(Uri path)
+        {
+            init();
             _configurationSectionXml = XDocument.Load(path.OriginalString);
         }
-        
+
         /// <summary>
         /// Initialise the generator
         /// </summary>
@@ -56,7 +58,7 @@ namespace ConfigGen
             using (var stream = new MemoryStream(Encoding.UTF8.GetBytes(xml)))
             {
                 _configurationSectionXml = XDocument.Load(stream);
-            }            
+            }
         }
 
 
@@ -73,8 +75,9 @@ namespace ConfigGen
             Namespaces.Add("System.Collections");
             Namespaces.Add("System.Text");
             Namespaces.Add("System.Configuration");
+            Namespaces.Add("System.Linq");
             _codeDomeCompileUnit.Namespaces.Add(_namespace);
-            
+
         }
         #endregion
 
@@ -158,7 +161,7 @@ namespace ConfigGen
                 itw.Close();
             }
         }
-        
+
         /// <summary>
         /// Creates the code for an XML element
         /// </summary>
@@ -169,12 +172,13 @@ namespace ConfigGen
             if (_createdTypes.Contains(doc.Name.LocalName))
             {
                 return null;
-            } else
+            }
+            else
             {
                 _createdTypes.Add(doc.Name.LocalName);
             }
 
-            if(ElementIsCollection(doc))
+            if (ElementIsCollection(doc))
             {
                 return CreateCollectionElement(doc);
             }
@@ -184,7 +188,7 @@ namespace ConfigGen
             }
         }
 
-        
+
         /// <summary>
         /// Checks if an XML element is a collection
         /// </summary>
@@ -205,11 +209,11 @@ namespace ConfigGen
         protected void CreateSectionElement(XElement doc)
         {
             var postfix = "";
-            if(!doc.Name.LocalName.EndsWith("Section"))
+            if (!doc.Name.LocalName.EndsWith("Section"))
             {
                 postfix = "Section";
             }
-            CodeTypeDeclaration element = new CodeTypeDeclaration(string.Format("{0}{1}",UpperCaseFirst(doc.Name.LocalName),postfix));
+            CodeTypeDeclaration element = new CodeTypeDeclaration(string.Format("{0}{1}", UpperCaseFirst(doc.Name.LocalName), postfix));
             element.IsClass = true;
             element.TypeAttributes = System.Reflection.TypeAttributes.Public;
             element.BaseTypes.Add(new CodeTypeReference { BaseType = typeof(ConfigurationSection).FullName });
@@ -261,7 +265,7 @@ namespace ConfigGen
         /// <returns>Name of the class to be generated</returns>
         protected string GetRegularElementName(XElement element)
         {
-            return string.Format("{0}{1}",UpperCaseFirst(element.Name.LocalName), "Element");
+            return string.Format("{0}{1}", UpperCaseFirst(element.Name.LocalName), "Element");
         }
 
         /// <summary>
@@ -271,7 +275,7 @@ namespace ConfigGen
         /// <returns>Classname to use</returns>
         protected string GetCollectionElementName(XElement element)
         {
-            return string.Format("{0}{1}", UpperCaseFirst(element.Name.LocalName ), "Collection");
+            return string.Format("{0}{1}", UpperCaseFirst(element.Name.LocalName), "Collection");
         }
 
         /// <summary>
@@ -281,11 +285,17 @@ namespace ConfigGen
         /// <returns>The created object</returns>
         protected CodeTypeDeclaration CreateCollectionElement(XElement doc)
         {
+            // First create the sub element as we need some information about it
+            var subElement = CreateElement(doc.Elements().First());
+
+            //Create the collection
             CodeTypeDeclaration element = new CodeTypeDeclaration(GetCollectionElementName(doc));
             string collectionType = "";
             collectionType = GetRegularElementName(doc.Elements().First());
+
+            // Add required attribute(s)
             element.CustomAttributes.Add(new CodeAttributeDeclaration(
-                "ConfigurationCollection", 
+                "ConfigurationCollection",
                 new CodeAttributeArgument[]
                 {
                     new CodeAttributeArgument(new CodeTypeOfExpression(collectionType)),
@@ -293,13 +303,17 @@ namespace ConfigGen
                 }
             ));
             element.TypeAttributes = System.Reflection.TypeAttributes.Public;
+
+            // Define which classes this extends
             element.BaseTypes.Add(new CodeTypeReference { BaseType = typeof(ConfigurationElementCollection).FullName });
+            
+            // Adds methods for creating & retrieving subelements
+            AddCollectionMethods(element, subElement);
 
-            var sub = CreateElement(doc.Elements().First());
-            AddCollectionMethods(element, sub);
-
+            // Add any attributes on the collection to the section
             AddAttibutes(doc, element);
 
+            // Add type to the namespace
             _namespace.Types.Add(element);
             return element;
         }
@@ -335,9 +349,59 @@ namespace ConfigGen
                         new CodeTypeReference(sub.Name),
                         new CodeVariableReferenceExpression("element")
                     )
-                    ,sub.Members[0].Name
+                    , sub.Members[0].Name
                 )));
             element.Members.Add(getElementKey);
+            AddGetEnumerator(element);
+        }
+        
+        /// <summary>
+        /// Adds enumeration method to a <see cref="ConfigurationElementCollection"/>
+        /// </summary>
+        /// <param name="element">Collection type to add the method to</param>
+        protected void AddGetEnumerator(CodeTypeDeclaration element)
+        {
+            // Add public new IEnumerator GetEnumerator()
+            var getEnumerator = new CodeMemberMethod
+            {
+                ReturnType = new CodeTypeReference(typeof(IEnumerator)),
+                Attributes = MemberAttributes.Public | MemberAttributes.New | MemberAttributes.Final,
+                Name = "GetEnumerator"
+            };
+
+            var listType = new CodeTypeReference(typeof(List<ConfigurationElement>));            
+
+            // Define list to contain the elements
+            getEnumerator.Statements.Add(new CodeVariableDeclarationStatement(listType, "elements"));
+
+            // Initialize elements
+            getEnumerator.Statements.Add(new CodeAssignStatement(
+                new CodeVariableReferenceExpression("elements"),
+                new CodeObjectCreateExpression(listType)
+            ));
+
+            // Get enumerator
+            getEnumerator.Statements.Add(new CodeAssignStatement(new CodeSnippetExpression("var e"), new CodeSnippetExpression("this.BaseGetAllKeys().GetEnumerator()")));
+
+            // Create for statement
+            var forStatement = new CodeIterationStatement(new CodeSnippetStatement(), new CodeSnippetExpression("e.MoveNext()"), new CodeSnippetStatement());
+            forStatement.Statements.Add(new CodeMethodInvokeExpression(
+                new CodeMethodReferenceExpression(
+                    new CodeVariableReferenceExpression("elements"), "Add"),
+                  
+                        new CodeMethodInvokeExpression(
+                            new CodeMethodReferenceExpression(
+                                new CodeThisReferenceExpression(), "BaseGet"),
+                                new CodePropertyReferenceExpression(new CodeVariableReferenceExpression("e"), "Current")
+                            ))
+            );
+            getEnumerator.Statements.Add(forStatement);
+
+            // Return correct enumerator
+            getEnumerator.Statements.Add(new CodeMethodReturnStatement(new CodeMethodInvokeExpression(new CodeMethodReferenceExpression(new CodeVariableReferenceExpression("elements"), "GetEnumerator"))));
+
+            // Add Method to class
+            element.Members.Add(getEnumerator);
         }
 
         /// <summary>
@@ -361,6 +425,7 @@ namespace ConfigGen
         /// <param name="attributeType"><see cref="Type"/> of the attribute to add</param>
         private void AddAttribute(string name, CodeTypeDeclaration element, CodeTypeReference attributeType)
         {
+
             var property = new CodeMemberProperty();
             property.Name = UpperCaseFirst(name);
             property.Type = attributeType;
@@ -395,7 +460,7 @@ namespace ConfigGen
         /// <returns></returns>
         private string UpperCaseFirst(string s)
         {
-            if(string.IsNullOrEmpty(s))
+            if (string.IsNullOrEmpty(s))
             {
                 return s;
             }
